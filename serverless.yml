@@ -1,0 +1,49 @@
+service: sentinel-tiler
+
+provider:
+  name: aws
+  runtime: python3.6
+  stage: production
+
+  region: eu-central-1
+
+  iamRoleStatements:
+  -  Effect: "Allow"
+     Action:
+       - "s3:GetObject"
+     Resource:
+       - "arn:aws:s3:::sentinel-s2-l1c/*"
+
+  environment:
+    PYTHONPATH: /var/task/vendored
+    GDAL_DATA: /var/task/share/gdal
+    GDAL_CACHEMAX: 75%
+    VSI_CACHE: TRUE
+    VSI_CACHE_SIZE: 536870912
+    GDAL_DISABLE_READDIR_ON_OPEN: true
+    CPL_VSIL_CURL_ALLOWED_EXTENSIONS: ".jp2,.ovr"
+
+  #Optional Bucket where you store your lambda package
+  # deploymentBucket: {YOUR BUCKET}
+
+custom:
+  apigwBinary:
+    types:
+      - '*/*'
+
+plugins:
+  - serverless-apigw-binary
+
+package:
+  artifact: package.zip
+
+functions:
+  sentinel-tiler:
+    handler: app.sentinel.SENTINEL_APP
+    memorySize: 1536
+    timeout: 40
+    events:
+      - http:
+          path: sentinel/{proxy+}
+          method: get
+          cors: true
