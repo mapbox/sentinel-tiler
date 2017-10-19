@@ -1,6 +1,7 @@
 # sentinel-tiler
 Create a serverless tile server for Amazon's Sentinel-2 Public Dataset based on rasterio python library.
 
+This project is linked to the `landsat-tiler` projected introduced in https://blog.mapbox.com/combining-the-power-of-aws-lambda-and-rasterio-8ffd3648c348
 
 #### Sentinel data on AWS
 
@@ -9,19 +10,6 @@ Since 2016 ESA Sentinel-2 data is hosted on AWS and can be freely accessed.
 > Each file is its own object in the sentinel-s2-l1c Amazon S3 bucket. The data are organised into tiles using the Military grid system. The basic data format is the following:
 
 more info: https://aws.amazon.com/public-datasets/sentinel-2/
-
-
-# Custom or Simple
-Sentinel-2 data are stored in JPEG2000 format. While this has some advantage (mainly file size), this format is not really cloud friendly [ref](https://trac.osgeo.org/gdal/wiki/CloudOptimizedGeoTIFF). JPEG2000 started as a proprietary format but recently there has been a massive work by `University of Louvain` and also `Even Rouault` to develop an open source driver to decode and encode JPEG2000 files.
-
-Quote form `OpenJPEG` [repo](https://github.com/uclouvain/openjpeg)
->OpenJPEG is an open-source JPEG 2000 codec written in C language. It has been developed in order to promote the use of JPEG 2000, a still-image compression standard from the Joint Photographic Experts Group (JPEG). Since April 2015, it is officially recognized by ISO/IEC and ITU-T as a JPEG 2000 Reference Software.
-
-To create the lambda package we need to have GDAL and our python module compiled on a Amazonlinux like machine. Using Docker we can do everything locally ([perrygeo blog](http://www.perrygeo.com/running-python-with-compiled-code-on-aws-lambda.html)) but to keep everything simple and fast we can use the already created **Remotepixel**'s amazonlinux docker image available on [Docker Hub](https://hub.docker.com/r/remotepixel/amazonlinux-gdal/). This docker image has a custom version of GDAL2 compiled supporting GeoTIFF and OpenJPEG formats.
-
-That said, OpenJPEG driver is not yet as fast as the other proprietary Jpeg2000 drivers like ECW, MrSID or Kakadu. In this repo you can have the possibility to create the a custom GDAL install with any of the drivers you have the license for.
-
-Update: Even Rouault has made some major improvements in OpenJPEG 2.3.0 [blog](https://erouault.blogspot.ca/2017/10/optimizing-jpeg2000-decoding.html).
 
 # Installation
 
@@ -33,7 +21,21 @@ Update: Even Rouault has made some major improvements in OpenJPEG 2.3.0 [blog](h
 
 ## Create package
 
-##### Simple (using remotepixel/amazonlinux-gdal:latest)
+Creating a python lambda package with some C (or Cython) libraries like Rasterio/GDAL has never been an easy task because you have to compile and build it on the same infrastructure where it's going to be used (Amazon linux AMI). Until recently, to create your package you had to launch an EC2 instance using the official Amazon Linux AMI and create your package on it (see [perrygeo blog](http://www.perrygeo.com/running-python-with-compiled-code-on-aws-lambda.html) or [Remotepixel blog](https://remotepixel.ca/blog/landsat8-ndvi-20160212.html)).
+
+But this was before, Late 2016, the AWS team released the Amazon Linux image on docker, so it's now possible to use it `locally` to compile C libraries and create complex lambda package ([see Dockerfile](https://github.com/mapbox/sentinel-tiler/blob/master/Dockerfiles/Simple)).
+
+#### Custom or Simple
+Sentinel-2 data are stored in JPEG2000 format. While this has some advantage (mainly file size), this format is not really cloud optimized [ref](https://trac.osgeo.org/gdal/wiki/CloudOptimizedGeoTIFF). JPEG2000 started as a proprietary format but recently there has been a massive work by `University of Louvain` and also `Even Rouault` to develop an open source driver to decode and encode JPEG2000 files.
+
+Quote form `OpenJPEG` [repo](https://github.com/uclouvain/openjpeg)
+>OpenJPEG is an open-source JPEG 2000 codec written in C language. It has been developed in order to promote the use of JPEG 2000, a still-image compression standard from the Joint Photographic Experts Group (JPEG). Since April 2015, it is officially recognized by ISO/IEC and ITU-T as a JPEG 2000 Reference Software.
+
+That said, OpenJPEG driver is not yet as fast as the other proprietary Jpeg2000 drivers like ECW, MrSID or Kakadu. In this repo you can have the possibility to create the a custom GDAL install with any of the drivers you have the license for.
+
+Update: Even Rouault has made some major improvements in OpenJPEG 2.3.0 [blog](https://erouault.blogspot.ca/2017/10/optimizing-jpeg2000-decoding.html).
+
+##### Simple (with rasterio wheels (OpenJPEG 2.3.0))
 
 ```bash
 # Build Amazon linux AMI docker container + Install Python modules + create package
@@ -55,6 +57,10 @@ cd sentinel-tiler/
 make all-custom
 ```
 
+Note: to stay under AWS lambda package sizes limits (100Mb zipped file / 250Mb unzipped archive) we need to use some [`tricks`](https://github.com/mapbox/landsat-tiler/blob/e4eebb512f51c55d95607daa483a14d2091fa0a1/Dockerfile#L30).
+- remove every packages that are already available natively in AWS Lambda (boto3, botocore ...)
+- keep only precompiled python code (`.pyc`) so it lighter and it loads faster
+
 ## Deploy
 
 ```bash
@@ -62,6 +68,8 @@ make all-custom
 npm install
 sls deploy
 ```
+
+*Note: If you use the `custom` GDAL you need to add `GDAL_DATA: /var/task/share/gdal` in the AWS Lambda environment variables.*
 
 :tada: You should be all set there.
 

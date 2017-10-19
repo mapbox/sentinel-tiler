@@ -15,8 +15,7 @@ provider:
        - "arn:aws:s3:::sentinel-s2-l1c/*"
 
   environment:
-    PYTHONPATH: /var/task/vendored
-    GDAL_DATA: /var/task/share/gdal
+    # GDAL_DATA: /var/task/share/gdal # NEEDED IF CUSTOM GDAL
     GDAL_CACHEMAX: 75%
     VSI_CACHE: TRUE
     VSI_CACHE_SIZE: 536870912
