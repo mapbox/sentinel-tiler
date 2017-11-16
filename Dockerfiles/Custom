@@ -1,4 +1,5 @@
-FROM amazonlinux:latest #Official amazon linux AMI
+# Official amazon linux AMI
+FROM amazonlinux:latest
 
 ################################################################################
 #                             INSTALL PYTHON 3.6                               #
