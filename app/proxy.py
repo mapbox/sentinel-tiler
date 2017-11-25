@@ -1,14 +1,11 @@
-"""app.proxy: translate request from AWS api-gateway"""
+"""app.proxy: translate request from AWS api-gateway
+Freely adapted from https://github.com/aws/chalice
+"""
 
 import re
-import json
 import sys
+import json
 import logging
-
-# Implementation note:  This file is intended to be a standalone file
-# that gets copied into the lambda deployment package.  It has no dependencies
-# on other parts of chalice so it can stay small and lightweight, with minimal
-# startup overhead.
 
 _PARAMS = re.compile('<\w+\:?\w+>')
 
@@ -172,15 +169,12 @@ class API(object):
             'FOUND': '302',
             'NOT_FOUND': '404',
             'CONFLICT': '409',
-            'ERROR': '500'
-        }
+            'ERROR': '500'}
+
         messageData = {
             'statusCode': statusCode[status],
             'body': response_body,
-            'headers': {
-                'Content-Type': content_type
-            }
-        }
+            'headers': {'Content-Type': content_type}}
 
         if cors:
             messageData['headers']['Access-Control-Allow-Origin'] = '*'
@@ -196,23 +190,22 @@ class API(object):
         resource_path = event['path']
         if resource_path is None:
             return self.response('NOK', 'application/json', json.dumps({
-                'ErrorMessage': 'Bad Route: {resource_path}'}))
+                'errorMessage': 'Bad Route: {resource_path}'}))
 
         if not self._url_matching(resource_path):
             return self.response('NOK', 'application/json', json.dumps({
-                'ErrorMessage': 'No view function for: {}'.format(resource_path)}))
+                'errorMessage': 'No view function for: {}'.format(resource_path)}))
 
         route_entry = self.routes[self._get_route_match(resource_path)]
 
         http_method = event['httpMethod']
         if http_method not in route_entry.methods:
             return self.response('NOK', 'application/json', json.dumps({
-                'ErrorMessage': 'Unsupported method: {}'.format(http_method)}), route_entry.cors)
+                'errorMessage': 'Unsupported method: {}'.format(http_method)}), route_entry.cors)
 
         view_function = route_entry.view_function
 
-        function_args = self._get_matching_args(route_entry.uri_pattern,
-                                                resource_path)
+        function_args = self._get_matching_args(route_entry.uri_pattern, resource_path)
 
         self.current_request = Request(event['queryStringParameters'],
                                        event['path'],
@@ -220,10 +213,9 @@ class API(object):
 
         try:
             response = view_function(*function_args)
-        except Exception as err:
-            self.log.error(err)
-            response = ('ERROR', 'application/json',
-                        json.dumps({'ErrorMessage': str(err)}))
 
-        return self.response(response[0], response[1], response[2],
-                             route_entry.cors)
+        except Exception as err:
+            self.log.error(str(err))
+            response = ('ERROR', 'application/json', json.dumps({'errorMessage': str(err)}))
+
+        return self.response(response[0], response[1], response[2], route_entry.cors)
