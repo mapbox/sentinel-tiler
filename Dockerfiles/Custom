@@ -146,7 +146,7 @@ ENV GDAL_CONFIG $APP_DIR/local/bin/gdal-config
 ################################################################################
 
 # Install rio-tiler
-RUN pip3 install rio-tiler>=0.0.3 --no-binary numpy,rasterio -t /tmp/vendored -U
+RUN pip3 install rio-tiler>=1.0.0 lambda_proxy --no-binary numpy,rasterio -t /tmp/vendored -U
 
 # Reduce Lambda package size to fit the 250Mb limit
 # Mostly based on https://github.com/jamesandersen/aws-machine-learning-demo

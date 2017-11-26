@@ -128,20 +128,20 @@ const updateRasterTile = () => {
 
     const tileURL = `${sentinel_tiler_url}/sentinel/tiles/${meta.sceneid}/{z}/{x}/{y}.png?` +
         `rgb=${rgb}&tile=256` +
-        `&r_bds=${meta.rgbMinMax[bands[0]]}` +
-        `&g_bds=${meta.rgbMinMax[bands[1]]}` +
-        `&b_bds=${meta.rgbMinMax[bands[2]]}`;
+        `&histo=${meta.rgbMinMax[bands[0]]}-${meta.rgbMinMax[bands[1]]}-${meta.rgbMinMax[bands[2]]}`;
+
+    const attrib = '<span> &copy; Copernicus / ESA 2017 | </span>';
 
     $(".sentinel-info .s2rgb").text(rgb.toString());
 
     map.addSource('sentinel-tiles', {
         type: "raster",
         tiles: [tileURL],
-        attribution : ['<span> &copy; Copernicus / ESA 2017 | </span>'],
+        attribution : attrib,
         bounds: scope.imgMetadata.bounds,
         minzoom: 7,
         maxzoom: 15,
-        tileSize: 512
+        tileSize: 256
     });
 
     map.addLayer({
