@@ -91,6 +91,9 @@ def sentinel_tile(scene, tile_z, tile_x, tile_y, tileformat):
 
     tile = array_to_img(tile, tileformat)
 
+    if tileformat == 'jpg':
+        tileformat = 'jpeg'
+
     return ('OK', f'image/{tileformat}', tile)
 
 
@@ -130,6 +133,10 @@ def sentinel_ratio(scene, tile_z, tile_x, tile_y, tileformat):
             linear_rescale(tile, in_range=range_val, out_range=[1, 255]), 0).astype(np.uint8)
 
     tile = array_to_img(tile, tileformat, color_map=get_colormap(name='cfastie'))
+
+
+    if tileformat == 'jpg':
+        tileformat = 'jpeg'
 
     return ('OK', f'image/{tileformat}', tile)
 
