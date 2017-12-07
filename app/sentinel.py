@@ -7,8 +7,6 @@ from functools import reduce
 import numpy as np
 import numexpr as ne
 
-from cachetools.func import rr_cache
-
 from rio_tiler import sentinel2
 from rio_tiler.utils import array_to_img, linear_rescale, get_colormap
 
@@ -29,7 +27,6 @@ class SentinelTilerError(Exception):
     """Base exception class"""
 
 
-@rr_cache()
 @SENTINEL_APP.route('/sentinel/bounds/<scene>', methods=['GET'], cors=True)
 def sentinel_bounds(scene):
     """
@@ -39,7 +36,6 @@ def sentinel_bounds(scene):
     return ('OK', 'application/json', json.dumps(info))
 
 
-@rr_cache()
 @SENTINEL_APP.route('/sentinel/metadata/<scene>', methods=['GET'], cors=True)
 def sentinel_metadata(scene):
     """
@@ -58,7 +54,6 @@ def sentinel_metadata(scene):
     return ('OK', 'application/json', json.dumps(info))
 
 
-@rr_cache()
 @SENTINEL_APP.route('/sentinel/tiles/<scene>/<int:z>/<int:x>/<int:y>.<ext>', methods=['GET'], cors=True)
 def sentinel_tile(scene, tile_z, tile_x, tile_y, tileformat):
     """
@@ -81,23 +76,19 @@ def sentinel_tile(scene, tile_z, tile_x, tile_y, tileformat):
     tilesize = int(tilesize) if isinstance(tilesize, str) else tilesize
 
     tile = sentinel2.tile(scene, tile_x, tile_y, tile_z, bands, tilesize=tilesize)
-
-    # Rescale Intensity to byte (1->255) with 0 being NoData
-    histo_cuts = dict(zip(bands, histoCut))
-    for bdx, band in enumerate(bands):
-        tile[bdx] = np.where(
+    rtile = np.zeros((len(bands), tilesize, tilesize), dtype=np.uint8)
+    for bdx in range(len(bands)):
+        rtile[bdx] = np.where(
             tile[bdx] > 0,
-            linear_rescale(tile[bdx], in_range=histo_cuts.get(band), out_range=[1, 255]), 0)
+            linear_rescale(tile[bdx], in_range=histoCut[bdx], out_range=[1, 255]), 0)
 
-    tile = array_to_img(tile, tileformat)
-
+    tile = array_to_img(rtile, tileformat)
     if tileformat == 'jpg':
         tileformat = 'jpeg'
 
     return ('OK', f'image/{tileformat}', tile)
 
 
-@rr_cache()
 @SENTINEL_APP.route('/sentinel/processing/<scene>/<int:z>/<int:x>/<int:y>.<ext>', methods=['GET'], cors=True)
 def sentinel_ratio(scene, tile_z, tile_x, tile_y, tileformat):
     """
@@ -128,13 +119,11 @@ def sentinel_ratio(scene, tile_z, tile_x, tile_y, tileformat):
         -9999)
 
     range_val = equation = RATIOS[ratio_value]['rg']
-    tile = np.where(
+    rtile = np.where(
             tile != -9999,
             linear_rescale(tile, in_range=range_val, out_range=[1, 255]), 0).astype(np.uint8)
 
-    tile = array_to_img(tile, tileformat, color_map=get_colormap(name='cfastie'))
-
-
+    tile = array_to_img(rtile, tileformat, color_map=get_colormap(name='cfastie'))
     if tileformat == 'jpg':
         tileformat = 'jpeg'
 
