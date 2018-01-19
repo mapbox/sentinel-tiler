@@ -1,4 +1,4 @@
-# Use the official amazonlinux AMI image
+# Official amazon linux AMI
 FROM amazonlinux:latest
 
 ################################################################################
