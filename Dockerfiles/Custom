@@ -39,20 +39,19 @@ RUN cd $APP_DIR \
    && unzip $PROJ_VERSION.zip \
    && cd proj.4-$PROJ_VERSION \
    && sh autogen.sh \
-   && ./configure --prefix=$APP_DIR/local \
+   && ./configure CFLAGS="-O2 -Wl,-S" --prefix=$APP_DIR/local \
    && make && make install && make clean \
    && rm -rf $APP_DIR/$PROJ_VERSION.zip $APP_DIR/proj.4-$PROJ_VERSION
 
-ENV GEOS_VERSION 3.5.0
+ENV GEOS_VERSION 3.6.2
 RUN cd $APP_DIR \
-  && wget https://github.com/libgeos/libgeos/archive/$GEOS_VERSION.tar.gz \
-  && tar -zvxf $GEOS_VERSION.tar.gz \
+  && curl -f -L -O http://download.osgeo.org/geos/geos-$GEOS_VERSION.tar.bz2 \
+  && tar jxf geos-$GEOS_VERSION.tar.bz2 \
   && cd geos-$GEOS_VERSION \
-  && mkdir build \
-  && cd build \
-  && cmake -DCMAKE_INSTALL_PREFIX=$APP_DIR/local .. \
-  && make install && make clean \
+  && CFLAGS="-O2 -Wl,-S" CXXFLAGS="-O2 -Wl,-S" ./configure --prefix=$APP_DIR/local \
+  && make && make install && make clean \
   && rm -rf $APP_DIR/geos-$GEOS_VERSION $APP_DIR/$GEOS_VERSION.tar.gz
+
 
 ################################################################################
 #                              CUSTOM DRIVERS                                  #
@@ -65,7 +64,7 @@ RUN cd $APP_DIR \
   && cd openjpeg-$OPENJPEG_VERSION/ \
   && mkdir build \
   && cd build \
-  && cmake -DCMAKE_INSTALL_PREFIX=$APP_DIR/local .. \
+  && cmake .. -DBUILD_THIRDPARTY:BOOL=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$APP_DIR/local \
   && make install && make clean \
   && rm -rf $APP_DIR/openjpeg-$OPENJPEG_VERSION $APP_DIR/v$OPENJPEG_VERSION.tar.gz
 
@@ -86,10 +85,12 @@ RUN cd $APP_DIR \
 && cd $APP_DIR/gdal-$GDAL_VERSION \
 && wget https://github.com/sgillies/frs-wheel-builds/raw/fafaeadfb638f44d8384e3742c829d2d68297915/patches/changeset_40330.diff \
 && patch -u --verbose -p4 < ./changeset_40330.diff \
-&& ./configure \
+&& CFLAGS="-O2 -Wl,-S" CXXFLAGS="-O2 -Wl,-S" ./configure \
    --prefix=$APP_DIR/local \
    --with-static-proj4=$APP_DIR/local \
    --with-geos=$APP_DIR/local/bin/geos-config \
+   --with-threads \
+   --disable-debug \
    --with-jpeg \
    --with-hide-internal-symbols \
    --with-curl \
@@ -147,7 +148,7 @@ ENV GDAL_CONFIG $APP_DIR/local/bin/gdal-config
 ################################################################################
 
 # Install rio-tiler
-RUN pip3 install rio-tiler>=0.0.3 --no-binary numpy,rasterio -t /tmp/vendored -U
+RUN pip3 install rio-tiler==1.0a.1 lambda_proxy==0.0.2 numexpr --no-binary numpy -t /tmp/vendored -U
 
 # Reduce Lambda package size to fit the 250Mb limit
 # Mostly based on https://github.com/jamesandersen/aws-machine-learning-demo

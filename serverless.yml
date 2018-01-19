@@ -3,7 +3,7 @@ service: sentinel-tiler
 provider:
   name: aws
   runtime: python3.6
-  stage: production
+  stage: yo
 
   region: eu-central-1
 
@@ -15,7 +15,7 @@ provider:
        - "arn:aws:s3:::sentinel-s2-l1c/*"
 
   environment:
-    # GDAL_DATA: /var/task/share/gdal # NEEDED IF CUSTOM GDAL
+    GDAL_DATA: /var/task/share/gdal # NEEDED IF CUSTOM GDAL
     GDAL_CACHEMAX: 75%
     VSI_CACHE: TRUE
     VSI_CACHE_SIZE: 536870912
@@ -40,7 +40,7 @@ functions:
   sentinel-tiler:
     handler: app.sentinel.SENTINEL_APP
     memorySize: 1536
-    timeout: 40
+    timeout: 20
     events:
       - http:
           path: sentinel/{proxy+}
