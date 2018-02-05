@@ -1,34 +1,60 @@
 """app.sentinel: handle request for Sentinel-tiler"""
 
+import re
 import json
 
-from cachetools.func import rr_cache
+import numpy as np
 
 from rio_tiler import sentinel2
-from rio_tiler.utils import array_to_img
+from rio_tiler.utils import array_to_img, linear_rescale, get_colormap, expression
 
-from app.proxy import API
+from aws_sat_api.search import sentinel2 as sentinel_search
 
-SENTINEL_APP = API(app_name="sentinel-tiler")
+from lambda_proxy.proxy import API
+
+APP = API(app_name="sentinel-tiler")
 
 
-@rr_cache()
-@SENTINEL_APP.route('/sentinel/bounds/<scene>', methods=['GET'], cors=True)
-def sentinel_bounds(scene):
+class SentinelTilerError(Exception):
+    """Base exception class"""
+
+
+@APP.route('/sentinel/search', methods=['GET'], cors=True)
+def search():
+    """Handle search requests
     """
-    Handle bounds requests
+
+    query_args = APP.current_request.query_params
+    query_args = query_args if isinstance(query_args, dict) else {}
+
+    utm = query_args['utm']
+    lat = query_args['lat']
+    grid = query_args['grid']
+    level = query_args.get('level', 'l1c')
+    full = query_args.get('full', True)
+
+    data = list(sentinel_search(utm, lat, grid, full, level))
+    info = {
+        'request': {'utm': utm, 'lat': lat, 'grid': grid, 'full': full, 'level': level},
+        'meta': {'found': len(data)},
+        'results': data}
+
+    return ('OK', 'application/json', json.dumps(info))
+
+
+@APP.route('/sentinel/bounds/<scene>', methods=['GET'], cors=True)
+def bounds(scene):
+    """Handle bounds requests
     """
     info = sentinel2.bounds(scene)
     return ('OK', 'application/json', json.dumps(info))
 
 
-@rr_cache()
-@SENTINEL_APP.route('/sentinel/metadata/<scene>', methods=['GET'], cors=True)
-def sentinel_metadata(scene):
+@APP.route('/sentinel/metadata/<scene>', methods=['GET'], cors=True)
+def metadata(scene):
+    """Handle metadata requests
     """
-    Handle metadata requests
-    """
-    query_args = SENTINEL_APP.current_request.query_params
+    query_args = APP.current_request.query_params
     query_args = query_args if isinstance(query_args, dict) else {}
 
     pmin = query_args.get('pmin', 2)
@@ -41,46 +67,66 @@ def sentinel_metadata(scene):
     return ('OK', 'application/json', json.dumps(info))
 
 
-@rr_cache()
-@SENTINEL_APP.route('/sentinel/tiles/<scene>/<int:z>/<int:x>/<int:y>.<ext>', methods=['GET'], cors=True)
-def sentinel_tile(scene, tile_z, tile_x, tile_y, tileformat):
+@APP.route('/sentinel/tiles/<scene>/<int:z>/<int:x>/<int:y>.<ext>', methods=['GET'], cors=True)
+def tile(scene, tile_z, tile_x, tile_y, tileformat):
+    """Handle tile requests
     """
-    Handle tile requests
-    """
-    query_args = SENTINEL_APP.current_request.query_params
+    query_args = APP.current_request.query_params
     query_args = query_args if isinstance(query_args, dict) else {}
 
-    rgb = query_args.get('rgb', '04,03,02')
-    rgb = rgb.split(',') if isinstance(rgb, str) else rgb
-    rgb = tuple(rgb)
+    bands = query_args.get('rgb', '04,03,02')
+    bands = tuple(re.findall(r'[0-9A]{2}', bands))
 
-    r_bds = query_args.get('r_bds', '0,16000')
-    if isinstance(r_bds, str):
-        r_bds = map(int, r_bds.split(','))
-    r_bds = tuple(r_bds)
+    histoCut = query_args.get('histo', '-'.join(['0,16000'] * len(bands)))
+    histoCut = re.findall(r'\d+,\d+', histoCut)
+    histoCut = list(map(lambda x: list(map(int, x.split(','))), histoCut))
 
-    g_bds = query_args.get('g_bds', '0,16000')
-    if isinstance(g_bds, str):
-        g_bds = map(int, g_bds.split(','))
-    g_bds = tuple(g_bds)
-
-    b_bds = query_args.get('b_bds', '0,16000')
-    if isinstance(b_bds, str):
-        b_bds = map(int, b_bds.split(','))
-    b_bds = tuple(b_bds)
+    if len(bands) != len(histoCut):
+        raise SentinelTilerError('The number of bands doesn\'t match the number of histogramm values')
 
     tilesize = query_args.get('tile', 256)
     tilesize = int(tilesize) if isinstance(tilesize, str) else tilesize
 
-    tile = sentinel2.tile(scene, tile_x, tile_y, tile_z, rgb, r_bds, g_bds,
-                          b_bds, tilesize=tilesize)
+    tile, mask = sentinel2.tile(scene, tile_x, tile_y, tile_z, bands, tilesize=tilesize)
 
-    tile = array_to_img(tile, tileformat)
+    rtile = np.zeros((len(bands), tilesize, tilesize), dtype=np.uint8)
+    for bdx in range(len(bands)):
+        rtile[bdx] = np.where(mask, linear_rescale(tile[bdx], in_range=histoCut[bdx], out_range=[0, 255]), 0)
+
+    tile = array_to_img(rtile, tileformat, mask=mask)
+    if tileformat == 'jpg':
+        tileformat = 'jpeg'
 
     return ('OK', f'image/{tileformat}', tile)
 
 
-@SENTINEL_APP.route('/favicon.ico', methods=['GET'], cors=True)
+@APP.route('/sentinel/processing/<scene>/<int:z>/<int:x>/<int:y>.<ext>', methods=['GET'], cors=True)
+def ratio(scene, tile_z, tile_x, tile_y, tileformat):
+    """Handle processing requests
+    """
+    query_args = APP.current_request.query_params
+    query_args = query_args if isinstance(query_args, dict) else {}
+
+    ratio_value = query_args['ratio']
+    range_value = query_args.get('range', [-1, 1])
+
+    tilesize = query_args.get('tile', 256)
+    tilesize = int(tilesize) if isinstance(tilesize, str) else tilesize
+
+    tile, mask = expression(scene, tile_x, tile_y, tile_z, ratio_value, tilesize=tilesize)
+    if len(tile.shape) == 2:
+        tile = np.expand_dims(tile, axis=0)
+
+    rtile = np.where(mask, linear_rescale(tile, in_range=range_value, out_range=[0, 255]), 0).astype(np.uint8)
+    tile = array_to_img(rtile, tileformat, color_map=get_colormap(name='cfastie'), mask=mask)
+
+    if tileformat == 'jpg':
+        tileformat = 'jpeg'
+
+    return ('OK', f'image/{tileformat}', tile)
+
+
+@APP.route('/favicon.ico', methods=['GET'], cors=True)
 def favicon():
     """
     favicon
