@@ -127,9 +127,7 @@ To be able to run it, edit those [two lines](https://github.com/mapbox/sentinel-
   *Options:*
 
   - rgb: Bands index for the RGB combination (default: (04, 03, 02))
-  - r_bds: First band (red) DN min and max values (default: (0, 16000))
-  - g_bds: Second band (green) DN min and max values (default: (0, 16000))
-  - b_bds: Third band (blue) DN min and max values (default: (0, 16000))
+  - histo: `-` delimited rgb histogram min/max (default: 0,16000-0,16000-0,16000 )
   - tile: Output image size (default: 256)
 
   *Output:*
@@ -138,7 +136,7 @@ To be able to run it, edit those [two lines](https://github.com/mapbox/sentinel-
 
   *Example:*
   - `<api-gateway-url>/sentinel/tile/S2A_tile_20161202_16SDG_0/10/262/397.png`
-  - `<api-gateway-url>/sentinel/tile/S2A_tile_20161202_16SDG_0/10/262/397.png?rgb=04,03,02&r_bds=100,3000&g_bds=130,2700&b_bds=500,4500&tile=512`
+  - `<api-gateway-url>/sentinel/tile/S2A_tile_20161202_16SDG_0/10/262/397.png?rgb=04,03,02&histo=100,3000-130,2700-500,4500&tile=512`
 
 
 ---
