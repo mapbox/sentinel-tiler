@@ -20,7 +20,7 @@ package:
 		-w /var/task/ \
 		--name lambda \
 		-itd \
-		lambda:tiler
+		lambda:tiler /bin/bash
 	docker cp lambda:/tmp/package.zip package.zip
 	docker stop lambda
 	docker rm lambda
@@ -40,8 +40,9 @@ test:
 		--env GDAL_TIFF_OVR_BLOCKSIZE=512 \
 		--env VSI_CACHE=TRUE \
 		--env VSI_CACHE_SIZE=536870912 \
+		--env AWS_REQUEST_PAYER="requester" \
 		-itd \
-		lambda:tiler
+		lambda:tiler /bin/bash
 	docker exec -it lambda bash -c 'unzip -q /tmp/package.zip -d /var/task'
 	docker exec -it lambda bash -c 'pip3 install boto3 jmespath python-dateutil -t /var/task'
 	docker exec -it lambda python3 -c 'from app.sentinel import APP; print(APP({"path": "/sentinel/bounds/S2A_tile_20161202_16SDG_0", "queryStringParameters": {}, "pathParameters": "null", "requestContext": "null", "httpMethod": "GET"}, None))'
@@ -66,8 +67,9 @@ test-custom:
 		--env GDAL_TIFF_OVR_BLOCKSIZE=512 \
 		--env VSI_CACHE=TRUE \
 		--env VSI_CACHE_SIZE=536870912 \
+		--env AWS_REQUEST_PAYER="requester" \
 		-itd \
-		lambda:tiler
+		lambda:tiler /bin/bash
 	docker exec -it lambda bash -c 'unzip -q /tmp/package.zip -d /var/task'
 	docker exec -it lambda bash -c 'pip3 install boto3 jmespath python-dateutil -t /var/task'
 	docker exec -it lambda python3 -c 'from app.sentinel import APP; print(APP({"path": "/sentinel/bounds/S2A_tile_20161202_16SDG_0", "queryStringParameters": {"pmin":"2", "pmax":"99.8"}, "pathParameters": "null", "requestContext": "null", "httpMethod": "GET"}, None))'

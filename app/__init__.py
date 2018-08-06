@@ -1,3 +1,2 @@
-# app
-
-__version__ = '2.0.0'
+"""Sentinel-tile app."""
+__version__ = '2.0.1'

@@ -10,9 +10,10 @@ provider:
   iamRoleStatements:
   -  Effect: "Allow"
      Action:
+       - "s3:ListBucket"
        - "s3:GetObject"
      Resource:
-       - "arn:aws:s3:::sentinel-s2-l1c/*"
+       - "arn:aws:s3:::sentinel-s2-l1c*"
 
   environment:
     GDAL_DATA: /var/task/share/gdal # NEEDED IF CUSTOM GDAL
@@ -20,6 +21,7 @@ provider:
     VSI_CACHE: TRUE
     VSI_CACHE_SIZE: 536870912
     GDAL_DISABLE_READDIR_ON_OPEN: true
+    AWS_REQUEST_PAYER: "requester"
     CPL_VSIL_CURL_ALLOWED_EXTENSIONS: ".jp2,.ovr"
 
   #Optional Bucket where you store your lambda package
@@ -29,8 +31,11 @@ custom:
   apigwBinary:
     types:
       - '*/*'
+  contentEncoding:
+    minimumCompressionSize: 0
 
 plugins:
+  - serverless-content-encoding
   - serverless-apigw-binary
 
 package:

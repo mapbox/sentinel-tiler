@@ -1,65 +1,62 @@
-# Official amazon linux AMI
-FROM amazonlinux:latest
+FROM lambdalinux/baseimage-amzn:2017.03-004
 
-################################################################################
-#                             INSTALL PYTHON 3.6                               #
-################################################################################
+RUN yum update -y && yum upgrade -y
+RUN yum install -y python36-devel python36-pip
+RUN yum clean all
 
-# Install apt dependencies for python3.6
-RUN yum install -y gcc gcc-c++ freetype-devel yum-utils findutils openssl-devel
-RUN yum -y groupinstall development
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
 
-RUN curl https://www.python.org/ftp/python/3.6.1/Python-3.6.1.tar.xz | tar -xJ \
-    && cd Python-3.6.1 \
-    && ./configure --prefix=/usr/local --enable-shared \
-    && make \
-    && make install \
-    && cd .. \
-    && rm -rf Python-3.6.1
-
-ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
-
-# Install python module needed for gdal and rasterio
-RUN pip3 install cython numpy --no-binary numpy
-
-################################################################################
-#                                INSTALL GDAL                                  #
-################################################################################
-
-# Install apt dependencies fro GDAL and drivers
-RUN yum install -y libjpeg-devel zlib-devel libpng-devel libcurl-devel \
-                   sqlite-devel.x86_64 wget zip  unzip tar gzip libtool cmake
+# install system libraries
+RUN yum makecache fast
+RUN yum install -y gcc gcc-c++ cmake automake glib2-devel
+RUN yum install -y wget tar unzip zip bzip2 gzip findutils yum-utils openssl-devel
+RUN yum install -y zlib-devel curl-devel libcurl-devel libjpeg-devel libpng-devel liblzma-dev libmpc-devel mpfr-devel gmp-devel
+RUN yum clean all
 
 ENV APP_DIR /tmp/app
 RUN mkdir $APP_DIR
 
-ENV PROJ_VERSION 4.9.3
+# versions of packages
+ENV \
+  PKGCONFIG_VERSION=0.29.2 \
+  PROJ_VERSION=5.1.0 \
+  GEOS_VERSION=3.6.2 \
+  OPENJPEG_VERSION=2.3.0 \
+  WEBP_VERSION=0.6.1 \
+  ZSTD_VERSION=1.3.4 \
+  GDAL_VERSION=2.3.1
+
+# pkg-config
 RUN cd $APP_DIR \
-   && wget -q https://github.com/OSGeo/proj.4/archive/$PROJ_VERSION.zip \
-   && unzip $PROJ_VERSION.zip \
-   && cd proj.4-$PROJ_VERSION \
-   && sh autogen.sh \
+   && wget -q https://pkg-config.freedesktop.org/releases/pkg-config-$PKGCONFIG_VERSION.tar.gz \
+   && tar xvf pkg-config-$PKGCONFIG_VERSION.tar.gz \
+   && cd pkg-config-$PKGCONFIG_VERSION \
    && ./configure CFLAGS="-O2 -Wl,-S" --prefix=$APP_DIR/local \
    && make && make install && make clean \
-   && rm -rf $APP_DIR/$PROJ_VERSION.zip $APP_DIR/proj.4-$PROJ_VERSION
+   && rm -rf $APP_DIR/pkg-config-$PKGCONFIG_VERSION.tar.gz $APP_DIR/pkg-config-$PKGCONFIG_VERSION
 
-ENV GEOS_VERSION 3.6.2
+# PROJ
 RUN cd $APP_DIR \
-  && curl -f -L -O http://download.osgeo.org/geos/geos-$GEOS_VERSION.tar.bz2 \
+   && wget -q http://download.osgeo.org/proj/proj-$PROJ_VERSION.tar.gz \
+   && tar -zvxf proj-$PROJ_VERSION.tar.gz \
+   && cd proj-$PROJ_VERSION \
+   && ./configure CFLAGS="-O2 -Wl,-S" --prefix=$APP_DIR/local \
+   && make && make install && make clean \
+   && rm -rf $APP_DIR/proj-$PROJ_VERSION.tar.gz $APP_DIR/proj-$PROJ_VERSION
+
+# GEOS
+RUN cd $APP_DIR \
+  && wget -q http://download.osgeo.org/geos/geos-$GEOS_VERSION.tar.bz2 \
   && tar jxf geos-$GEOS_VERSION.tar.bz2 \
   && cd geos-$GEOS_VERSION \
   && CFLAGS="-O2 -Wl,-S" CXXFLAGS="-O2 -Wl,-S" ./configure --prefix=$APP_DIR/local \
   && make && make install && make clean \
-  && rm -rf $APP_DIR/geos-$GEOS_VERSION $APP_DIR/$GEOS_VERSION.tar.gz
+  && rm -rf $APP_DIR/geos-$GEOS_VERSION $APP_DIR/geos-$GEOS_VERSION.tar.bz2
 
-
-################################################################################
-#                              CUSTOM DRIVERS                                  #
-################################################################################
-
-ENV OPENJPEG_VERSION 2.3.0
+# OPENJPEG
 RUN cd $APP_DIR \
-  && wget https://github.com/uclouvain/openjpeg/archive/v$OPENJPEG_VERSION.tar.gz \
+  && wget -q https://github.com/uclouvain/openjpeg/archive/v$OPENJPEG_VERSION.tar.gz \
   && tar -zvxf v$OPENJPEG_VERSION.tar.gz \
   && cd openjpeg-$OPENJPEG_VERSION/ \
   && mkdir build \
@@ -68,87 +65,103 @@ RUN cd $APP_DIR \
   && make install && make clean \
   && rm -rf $APP_DIR/openjpeg-$OPENJPEG_VERSION $APP_DIR/v$OPENJPEG_VERSION.tar.gz
 
-################################################################################
-################################################################################
+# WEBP
+RUN cd $APP_DIR\
+    && wget -q https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-${WEBP_VERSION}.tar.gz \
+    && tar xzf libwebp-${WEBP_VERSION}.tar.gz \
+    && cd libwebp-${WEBP_VERSION} \
+    && CFLAGS="-O2 -Wl,-S" ./configure --prefix=$APP_DIR/local/ \
+    && make && make install && make clean \
+    && rm -rf $APP_DIR/libwebp-${WEBP_VERSION} $APP_DIR/libwebp-${WEBP_VERSION}.tar.gz
+
+# ZSTD
+RUN cd $APP_DIR \
+  && wget -q https://github.com/facebook/zstd/archive/v${ZSTD_VERSION}.tar.gz \
+  && tar -zvxf v${ZSTD_VERSION}.tar.gz \
+  && cd zstd-${ZSTD_VERSION} \
+  && make PREFIX=$APP_DIR/local/ ZSTD_LEGACY_SUPPORT=0 CFLAGS=-O1 \
+  && make install PREFIX=$APP_DIR/local/ ZSTD_LEGACY_SUPPORT=0 CFLAGS=-O1 \
+  && make clean \
+  && rm -rf $APP_DIR/v${ZSTD_VERSION}.tar.gz $APP_DIR/zstd-${ZSTD_VERSION}
 
 ENV LD_LIBRARY_PATH=$APP_DIR/local/lib:$LD_LIBRARY_PATH
+ENV PKG_CONFIG_PATH=$APP_DIR/local/lib/pkgconfig/
 
-# Build and install GDAL (minimal support geotiff and jp2 support,
-# https://trac.osgeo.org/gdal/wiki/BuildingOnUnixWithMinimizedDrivers#no1)
-# applying patch from Sean Gillies https://github.com/sgillies/frs-wheel-builds/blob/fafaeadfb638f44d8384e3742c829d2d68297915/patches/changeset_40330.diff
-#   to enable openjpeg 2.3.0 support
-
-ENV GDAL_VERSION 2.2.2
+# GDAL
 RUN cd $APP_DIR \
-&& wget http://download.osgeo.org/gdal/$GDAL_VERSION/gdal${GDAL_VERSION//.}.zip \
-&& unzip gdal${GDAL_VERSION//.}.zip \
-&& cd $APP_DIR/gdal-$GDAL_VERSION \
-&& wget https://github.com/sgillies/frs-wheel-builds/raw/fafaeadfb638f44d8384e3742c829d2d68297915/patches/changeset_40330.diff \
-&& patch -u --verbose -p4 < ./changeset_40330.diff \
-&& CFLAGS="-O2 -Wl,-S" CXXFLAGS="-O2 -Wl,-S" ./configure \
-   --prefix=$APP_DIR/local \
-   --with-static-proj4=$APP_DIR/local \
-   --with-geos=$APP_DIR/local/bin/geos-config \
-   --with-threads \
-   --disable-debug \
-   --with-jpeg \
-   --with-hide-internal-symbols \
-   --with-curl \
-   --with-openjpeg=$APP_DIR/local \
-   --without-ecw \
-   --without-mrsid \
-   --without-jp2mrsid \
-   --without-bsb \
-   --without-cfitsio \
-   --without-cryptopp \
-   --without-expat \
-   --without-fme \
-   --without-freexl \
-   --without-gif \
-   --without-gif \
-   --without-gnm \
-   --without-grass \
-   --without-grib \
-   --without-hdf4 \
-   --without-hdf5 \
-   --without-idb \
-   --without-ingres \
-   --without-jasper \
-   --without-kakadu \
-   --without-libgrass \
-   --without-libkml \
-   --without-libtool \
-   --without-mrf \
-   --without-mysql \
-   --without-netcdf \
-   --without-odbc \
-   --without-ogdi \
-   --without-pcidsk \
-   --without-pcraster \
-   --without-pcre \
-   --without-perl \
-   --without-pg \
-   --without-php \
-   --without-png \
-   --without-python \
-   --without-qhull \
-   --without-sde \
-   --without-sqlite3 \
-   --without-webp \
-   --without-xerces \
-   --without-xml2 \
-   && make && make install \
-   && rm -rf $APP_DIR/gdal$m{GDAL_VERSION//.}.zip $APP_DIR/gdal-$GDAL_VERSION
+  && wget -q http://download.osgeo.org/gdal/$GDAL_VERSION/gdal-$GDAL_VERSION.tar.gz \
+  && tar -xzvf gdal-$GDAL_VERSION.tar.gz \
+  && cd gdal-$GDAL_VERSION \
+  && CFLAGS="-O2 -Wl,-S" CXXFLAGS="-O2 -Wl,-S" ./configure \
+      --prefix=$APP_DIR/local \
+      --with-proj=$APP_DIR/local \
+      --with-geos=$APP_DIR/local/bin/geos-config \
+      --with-openjpeg \
+      --with-webp=$APP_DIR/local \
+      --with-zstd=$APP_DIR/local \
+      --with-threads \
+      --disable-debug \
+      --with-jpeg \
+      --with-hide-internal-symbols \
+      --with-curl \
+      --without-bsb \
+      --without-cfitsio \
+      --without-cryptopp \
+      --without-ecw \
+      --without-expat \
+      --without-fme \
+      --without-freexl \
+      --without-gif \
+      --without-gif \
+      --without-gnm \
+      --without-grass \
+      --without-grib \
+      --without-hdf4 \
+      --without-hdf5 \
+      --without-idb \
+      --without-ingres \
+      --without-jasper \
+      --without-jp2mrsid \
+      --without-kakadu \
+      --without-libgrass \
+      --without-libkml \
+      --without-libtool \
+      --without-mrf \
+      --without-mrsid \
+      --without-mysql \
+      --without-netcdf \
+      --without-odbc \
+      --without-ogdi \
+      --without-pcidsk \
+      --without-pcraster \
+      --without-pcre \
+      --without-perl \
+      --without-pg \
+      --without-php \
+      --without-png \
+      --without-python \
+      --without-qhull \
+      --without-sde \
+      --without-sqlite3 \
+      --without-xerces \
+      --without-xml2 \
+    && make && make install && make clean \
+    && rm -rf $APP_DIR/gdal-$GDAL_VERSION.tar.gz $APP_DIR/gdal-$GDAL_VERSION
 
-ENV GDAL_DATA $APP_DIR/local/share/gdal
-ENV GDAL_CONFIG $APP_DIR/local/bin/gdal-config
+ENV GDAL_DATA=$APP_DIR/local/share/gdal
+ENV PROJ_LIB=$APP_DIR/local/share/proj
+ENV GDAL_CONFIG=$APP_DIR/local/bin/gdal-config
+ENV GEOS_CONFIG=$APP_DIR/local/bin/geos-config
+
+RUN pip-3.6 install pip -U
+RUN pip3 install cython numpy --no-binary numpy
 
 ################################################################################
 #                          INSTALL PYTHON MODULES                              #
 ################################################################################
 
 # Install rio-tiler
-RUN pip3 install rio-tiler==1.0b2 lambda-proxy==0.0.4 aws-sat-api==1.0.0 --no-binary numpy,rasterio -t /tmp/vendored -U
+RUN pip3 install rio-tiler==1.0rc1 lambda-proxy==0.0.4 aws-sat-api==2.0.1 --no-binary numpy,rasterio -t /tmp/vendored -U
 
 # Reduce Lambda package size to fit the 250Mb limit
 # Mostly based on https://github.com/jamesandersen/aws-machine-learning-demo
