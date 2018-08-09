@@ -12,8 +12,7 @@ provider:
        - "s3:GetObject"
      Resource:
        - "arn:aws:s3:::sentinel-s2-l1c*"
-  environment:
-    environment: ${file(./Dockerfiles/${opt:type}.yml):env}
+  environment: ${file(./Dockerfiles/${opt:type}.yml):env}
   #Optional Bucket where you store your lambda package
   # deploymentBucket: {YOUR BUCKET}
 
