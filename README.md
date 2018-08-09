@@ -41,7 +41,13 @@ Update: Even Rouault has made some major improvements in OpenJPEG 2.3.0 [blog](h
 # Build Amazon linux AMI docker container + Install Python modules + create package
 git clone https://github.com/mapbox/sentinel-tiler.git
 cd sentinel-tiler/
-make all
+make wheel
+```
+```bash
+# Deploy
+make deploy-wheel
+# Or
+sls deploy --type wheel
 ```
 
 ##### Custom
@@ -54,22 +60,19 @@ make all
 # Build Amazon linux AMI docker container + Install Python modules + create package
 git clone https://github.com/mapbox/sentinel-tiler.git
 cd sentinel-tiler/
-make all-custom
+make custom
+```
+
+```bash
+# Deploy
+make deploy-custom
+# Or
+sls deploy --type custom
 ```
 
 Note: to stay under AWS lambda package sizes limits (100Mb zipped file / 250Mb unzipped archive) we need to use some [`tricks`](https://github.com/mapbox/landsat-tiler/blob/e4eebb512f51c55d95607daa483a14d2091fa0a1/Dockerfile#L30).
 - remove every packages that are already available natively in AWS Lambda (boto3, botocore ...)
 - keep only precompiled python code (`.pyc`) so it lighter and it loads faster
-
-## Deploy
-
-```bash
-#configure serverless (https://serverless.com/framework/docs/providers/aws/guide/credentials/)
-npm install
-sls deploy
-```
-
-*Note: If you use the `custom` GDAL you need to add `GDAL_DATA: /var/task/share/gdal` in the AWS Lambda environment variables.*
 
 :tada: You should be all set there.
 

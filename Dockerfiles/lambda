@@ -1,0 +1,4 @@
+FROM amazonlinux:latest
+
+ENV LD_LIBRARY_PATH=/var/task/lib:$LD_LIBRARY_PATH
+ENV PYTHONPATH=/var/task

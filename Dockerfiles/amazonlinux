@@ -1,0 +1,17 @@
+FROM lambdalinux/baseimage-amzn:2017.03-004
+
+RUN yum update -y && yum upgrade -y
+RUN yum install -y python36-devel python36-pip
+RUN yum clean all
+
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
+
+# install system libraries
+RUN yum makecache fast
+RUN yum install -y gcc gcc-c++ cmake automake glib2-devel freetype-devel
+RUN yum install -y wget tar unzip zip bzip2 gzip findutils yum-utils openssl-devel
+RUN yum install -y zlib-devel curl-devel libcurl-devel libjpeg-devel libpng-devel liblzma-dev libmpc-devel mpfr-devel gmp-devel ImageMagick-devel.x86_64
+RUN yum clean all
+
+RUN pip-3.6 install pip -U

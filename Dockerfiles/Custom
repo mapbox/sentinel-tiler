@@ -1,18 +1,4 @@
-FROM lambdalinux/baseimage-amzn:2017.03-004
-
-RUN yum update -y && yum upgrade -y
-RUN yum install -y python36-devel python36-pip
-RUN yum clean all
-
-ENV LANG=en_US.UTF-8
-ENV LC_ALL=en_US.UTF-8
-
-# install system libraries
-RUN yum makecache fast
-RUN yum install -y gcc gcc-c++ cmake automake glib2-devel
-RUN yum install -y wget tar unzip zip bzip2 gzip findutils yum-utils openssl-devel
-RUN yum install -y zlib-devel curl-devel libcurl-devel libjpeg-devel libpng-devel liblzma-dev libmpc-devel mpfr-devel gmp-devel
-RUN yum clean all
+FROM amazonlinux:latest
 
 ENV APP_DIR /tmp/app
 RUN mkdir $APP_DIR
@@ -153,14 +139,12 @@ ENV PROJ_LIB=$APP_DIR/local/share/proj
 ENV GDAL_CONFIG=$APP_DIR/local/bin/gdal-config
 ENV GEOS_CONFIG=$APP_DIR/local/bin/geos-config
 
-RUN pip-3.6 install pip -U
 RUN pip3 install cython numpy --no-binary numpy
 
-################################################################################
-#                          INSTALL PYTHON MODULES                              #
-################################################################################
+#############################
+# Install Python dependencies
+#############################
 
-# Install rio-tiler
 RUN pip3 install rio-tiler==1.0rc1 lambda-proxy==0.0.4 aws-sat-api==2.0.1 --no-binary numpy,rasterio -t /tmp/vendored -U
 
 # Reduce Lambda package size to fit the 250Mb limit

@@ -1,36 +1,37 @@
 
 SHELL = /bin/bash
 
-all: build package
+clean:
+	docker stop lambda
+	docker rm lambda
 
 
-all-custom: build-custom package
+wheel:
+	docker build -f Dockerfiles/amazonlinux --tag amazonlinux:latest .
+	docker build -f Dockerfiles/wheel --tag lambda:latest .
+	docker run -w /var/task/ --name lambda -itd lambda:latest /bin/bash
+	docker cp lambda:/tmp/package.zip wheel.zip
+	docker stop lambda
+	docker rm lambda
 
 
-build:
-	docker build -f ./Dockerfiles/Simple -t lambda:tiler .
-
-
-build-custom:
-	docker build -f ./Dockerfiles/Custom -t lambda:tiler .
-
-
-package:
-	docker run \
-		-w /var/task/ \
-		--name lambda \
-		-itd \
-		lambda:tiler /bin/bash
-	docker cp lambda:/tmp/package.zip package.zip
+custom:
+	docker build -f Dockerfiles/amazonlinux --tag amazonlinux:latest .
+	docker build -f Dockerfiles/custom --tag lambda:latest .
+	docker run -w /var/task/ --name lambda -itd lambda:latest /bin/bash
+	docker cp lambda:/tmp/package.zip custom.zip
 	docker stop lambda
 	docker rm lambda
 
 
 #Local Test
-test:
+test-wheel:
+	docker build -f Dockerfiles/amazonlinux --tag amazonlinux:latest .
+	docker build -f Dockerfiles/lambda --tag lambda:latest .
 	docker run \
 		-w /var/task/ \
 		--name lambda \
+		--volume $(shell pwd)/:/data \
 		--env AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} \
 		--env AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} \
 		--env AWS_REGION=eu-central-1 \
@@ -42,8 +43,8 @@ test:
 		--env VSI_CACHE_SIZE=536870912 \
 		--env AWS_REQUEST_PAYER="requester" \
 		-itd \
-		lambda:tiler /bin/bash
-	docker exec -it lambda bash -c 'unzip -q /tmp/package.zip -d /var/task'
+		lambda:latest /bin/bash
+	docker exec -it lambda bash -c 'unzip -q /data/wheel.zip -d /var/task'
 	docker exec -it lambda bash -c 'pip3 install boto3 jmespath python-dateutil -t /var/task'
 	docker exec -it lambda python3 -c 'from app.sentinel import APP; print(APP({"path": "/sentinel/bounds/S2A_tile_20161202_16SDG_0", "queryStringParameters": {}, "pathParameters": "null", "requestContext": "null", "httpMethod": "GET"}, None))'
 	docker exec -it lambda python3 -c 'from app.sentinel import APP; print(APP({"path": "/sentinel/metadata/S2A_tile_20161202_16SDG_0", "queryStringParameters": {"pmin":"2", "pmax":"99.8"}, "pathParameters": "null", "requestContext": "null", "httpMethod": "GET"}, None))'
@@ -54,9 +55,12 @@ test:
 
 #Local Test
 test-custom:
+	docker build -f Dockerfiles/amazonlinux --tag amazonlinux:latest .
+	docker build -f Dockerfiles/lambda --tag lambda:latest .
 	docker run \
 		-w /var/task/ \
 		--name lambda \
+		--volume $(shell pwd)/:/data \
 		--env AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} \
 		--env AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} \
 		--env AWS_REGION=eu-central-1 \
@@ -69,8 +73,8 @@ test-custom:
 		--env VSI_CACHE_SIZE=536870912 \
 		--env AWS_REQUEST_PAYER="requester" \
 		-itd \
-		lambda:tiler /bin/bash
-	docker exec -it lambda bash -c 'unzip -q /tmp/package.zip -d /var/task'
+		lambda:latest /bin/bash
+	docker exec -it lambda bash -c 'unzip -q /data/custom.zip -d /var/task'
 	docker exec -it lambda bash -c 'pip3 install boto3 jmespath python-dateutil -t /var/task'
 	docker exec -it lambda python3 -c 'from app.sentinel import APP; print(APP({"path": "/sentinel/bounds/S2A_tile_20161202_16SDG_0", "queryStringParameters": {"pmin":"2", "pmax":"99.8"}, "pathParameters": "null", "requestContext": "null", "httpMethod": "GET"}, None))'
 	docker exec -it lambda python3 -c 'from app.sentinel import APP; print(APP({"path": "/sentinel/metadata/S2A_tile_20161202_16SDG_0", "queryStringParameters": {"pmin":"2", "pmax":"99.8"}, "pathParameters": "null", "requestContext": "null", "httpMethod": "GET"}, None))'
@@ -79,5 +83,9 @@ test-custom:
 	docker rm lambda
 
 
-deploy:
-	sls deploy
+deploy-wheel:
+	sls deploy --type wheel
+
+
+deploy-custom:
+	sls deploy --type custom

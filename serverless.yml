@@ -3,10 +3,8 @@ service: sentinel-tiler
 provider:
   name: aws
   runtime: python3.6
-  stage: production
-
+  stage: ${opt:stage, 'production'}
   region: eu-central-1
-
   iamRoleStatements:
   -  Effect: "Allow"
      Action:
@@ -14,16 +12,8 @@ provider:
        - "s3:GetObject"
      Resource:
        - "arn:aws:s3:::sentinel-s2-l1c*"
-
   environment:
-    GDAL_DATA: /var/task/share/gdal # NEEDED IF CUSTOM GDAL
-    GDAL_CACHEMAX: 75%
-    VSI_CACHE: TRUE
-    VSI_CACHE_SIZE: 536870912
-    GDAL_DISABLE_READDIR_ON_OPEN: true
-    AWS_REQUEST_PAYER: "requester"
-    CPL_VSIL_CURL_ALLOWED_EXTENSIONS: ".jp2,.ovr"
-
+    environment: ${file(./Dockerfiles/${opt:type}.yml):env}
   #Optional Bucket where you store your lambda package
   # deploymentBucket: {YOUR BUCKET}
 
@@ -39,7 +29,7 @@ plugins:
   - serverless-apigw-binary
 
 package:
-  artifact: package.zip
+  artifact: ${file(./Dockerfiles/${opt:type}.yml):artifact}
 
 functions:
   sentinel-tiler:

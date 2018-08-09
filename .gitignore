@@ -1,5 +1,6 @@
 .DS_Store
-package.zip
+custom.zip
+wheel.zip
 .serverless/
 node_modules/
 
